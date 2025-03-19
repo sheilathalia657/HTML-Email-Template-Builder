@@ -1,0 +1,1943 @@
+USE [MailInfo]
+GO
+/****** Object:  StoredProcedure [dbo].[spSendEmailODMotor]    Script Date: 3/5/2025 1:17:25 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[spSendEmailODMotor]
+	@piIntEmail int
+AS
+/****************************************************  
+**  File             : spSendEmailODMotor.sql		**
+**  Name             : spSendEmailODMotor           **
+**  Desc             : MPX Report OD Motor          **
+**  Author           : Stella						**
+**  Date Time Create : 4 Mei 2017 18:00:05			**
+****************************************************/  
+BEGIN
+	execute as login = 'sa';
+	SET NOCOUNT ON;
+
+	if object_id('tempdb..#odMCF') is not null
+		drop table #odMCF
+
+	if object_id('tempdb..#odMAF') is not null
+		drop table #odMAF
+
+	if object_id('tempdb..#ODWilayahtemp') is not null
+		drop table #ODWilayahtemp
+
+	if object_id('tempdb..#ODPT') is not null
+		drop table #ODPT
+	
+	if object_id('tempdb..#ODPTtemp') is not null
+		drop table #ODPTtemp
+	
+	if object_id('tempdb..#ODRegional') is not null
+		drop table #ODRegional
+	
+	if object_id('tempdb..#ODRegionaltemp') is not null
+		drop table #ODRegionaltemp
+	
+	if object_id('tempdb..#ODWilayah') is not null
+		drop table #ODWilayah
+
+	if object_id('tempdb..#ODArea') is not null
+		drop table #ODArea
+
+	if object_id('tempdb..#ODAreaTemp') is not null
+		drop table #ODAreaTemp
+
+	if object_id('tempdb..#tempRegional') is not null
+		drop table #tempRegional
+
+	if object_id('tempdb..#ODBranch') is not null
+		drop table #ODBranch
+
+	if object_id('tempdb..#ODBranchTemp') is not null
+		drop table #ODBranchTemp
+
+    if object_id('tempdb..#ODParentBranchTemp') is not null 
+	    drop table #ODParentBranchTemp 
+
+	if object_id('tempdb..#tempcabangpos') is not null 
+	    drop table #tempcabangpos 
+
+	if object_id('tempdb..#ODcabangpos') is not null 
+	    drop table #ODcabangpos
+
+	if object_id('tempdb..#cabangpostemp') is not null 
+	    drop table 	#cabangpostemp
+
+	declare @CurrDate datetime, 
+			@mtdThisMonth varchar(8), 
+		    @mtdlastMonth varchar(8), 
+			@OpenNPPaktifMAF int,
+			@OpenNPPODMAF int,
+			@OpenPersenNPPODMAF float,
+			@OpenNPPaktifMCF int,
+			@OpenNPPODMCF int,
+			@OpenPersenNPPODMCF float,
+			@OpenNPPaktifNasional int,
+			@OpenNPPODNasional int,
+			@OpenPersenNPPODNasional float,
+			@TotRecordMCF int,
+			@TotODMCF int,
+			@TotPersenODMCF float,
+			@TotRecordMAF int,
+			@TotODMAF int,
+			@TotPersenODMAF float,
+			@TotRecordNasional int,
+			@TotODNasional int,
+			@TotPersenODNasional float,
+			@TotalOpenAktifReg int,
+			@TotalOpenODReg int ,
+			@TotalOpenPersenODReg float,
+			@TotalCloseAktifReg int,
+			@TotalCloseODReg int ,
+			@TotalClosePersenODReg float,
+			@TotalLastMonthOpenAktifReg int,
+			@TotalLastMonthOpenODReg int,
+			@TotalLastMonthOpenPersenODReg float,
+			@TotalLastMonthCloseAktifReg int,
+			@TotalLastMonthCloseODReg int,
+			@TotalLastMonthClosePersenODReg float,
+			@TotalOpenAktifWilayah int,
+			@TotalOpenODWilayah int ,
+			@TotalOpenPersenODWilayah float,
+			@TotalCloseAktifWilayah int,
+			@TotalCloseODWilayah int ,
+			@TotalClosePersenODWilayah float,
+			@TotalLastMonthOpenAktifWilayah int,
+			@TotalLastMonthOpenODWilayah int,
+			@TotalLastMonthOpenPersenODWilayah float,
+			@TotalLastMonthCloseAktifWilayah int,
+			@TotalLastMonthCloseODWilayah int,
+			@TotalLastMonthClosePersenODWilayah float,
+			@od int,
+			@PT varchar(20),
+			@RegionalName varchar(30),
+			@WilayahName varchar(30),
+			@AreaName varchar(30),
+			@ParentBranchName varchar(30),
+			@TotRecordNPP int,
+			@TotODNPP int,
+			@TotPersenODNPP float,
+			@OpenNPPAktif int,
+			@OpenNPPOD int,
+			@OpenPersenNPPOD float,
+			@CloseNPPAktif int,
+			@CloseNPPOD int,
+			@ClosePersenNPPOD float,
+			@LastMonthOpenNPPAktif int,
+			@LastMonthOpenNPPOD int,
+			@LastMonthOpenPersenNPPOD float,
+			@LastMonthCloseNPPAktif int,
+			@LastMonthCloseNPPOD int,
+			@LastMonthClosePersenNPPOD float,
+			@Pemisah varchar(max),
+			@MsgHdr1 varchar(max),
+			@MsgHdr2 varchar(max),
+			@MsgHdr3 varchar(max),
+			@MsgHdr4 varchar(max),
+			@MsgHdr5 varchar(max),
+			@MsgHdr6 varchar(max),/*add sheila 20250305*/
+			@MsgBody1 varchar(max),
+			@MsgBody2 varchar(max),
+			@MsgBody3 varchar(max),
+			@MsgBody4 varchar(max),
+			@MsgBody5 varchar(max),
+			@MsgBody6 varchar(max),/*add sheila 20250305*/
+			@MsgFtr varchar(max),
+			@MailBody varchar(max),
+			@CurrRec int,
+			@TotRec int,
+			@ProfileName varchar(20), 
+			@BodyFormat varchar(20), 
+			@Subject varchar(50),
+			@mailRecipients varchar(max),
+			@mailCopyRecipients varchar(max),
+			@mailBlindCopyRecipients varchar(max),
+			@Attachments varchar(max),
+			@sql varchar(max),
+			@TotalOpenAktifparentbranch INT, 
+			@TotalOpenODparentbranch INT, 
+			@TotalCloseAktifparentbranch INT,
+			@TotalCloseODparentbranch INT, 
+			@TotalLastMonthOpenAktifparentbranch INT, 
+			@TotalLastMonthOpenODparentbranch INT, 
+			@TotalLastMonthCloseAktifparentbranch INT, 
+			@TotalLastMonthCloseODparentbranch INT,
+		    @TotalClosePersenODparentbranch FLOAT, 
+			@TotalLastMonthOpenPersenODparentbranch FLOAT, 
+			@TotalLastMonthClosePersenODparentbranch FLOAT, 
+			@TotalOpenPersenODparentbranch FLOAT
+
+			,@piIntEmail int = '2'
+
+	create table #odMCF (	
+				WilayahID varchar(2),
+				WilayahName varchar(25),
+				RegionalID varchar(2),
+				AreaID varchar(2),
+				AreaName varchar(30),
+				BranchID varchar(5),
+				nppno varchar(10),
+				approvedate datetime,
+				OP numeric(21,2),
+				DeadLine datetime,
+				LastPaydate datetime,
+				od int)
+				
+	create table #odMAF (	
+				WilayahID varchar(2),
+				WilayahName varchar(25),
+				RegionalID varchar(2),
+				AreaID varchar(2),
+				AreaName varchar(30),
+				BranchID varchar(5),
+				nppno varchar(10),
+				approvedate datetime,
+				OP numeric(21,2),
+				DeadLine datetime,
+				LastPaydate datetime,
+				od int)
+
+	create table #ODPT(
+				PT varchar(10),
+				OpenNPPaktif numeric(18,0),
+				OpenNPPod numeric(18,0),
+				OpenPersenNPPOD float,
+				CloseNPPaktif numeric(18,0),
+				CloseNPPod numeric(18,0),
+				ClosePersenNPPOD float,
+				LastMonthOpenNPPaktif numeric(18,0),
+				LastMonthOpenNPPod numeric(18,0),
+				LastMonthOpenPersenNPPOD float,
+				LastMonthCloseNPPaktif numeric(18,0),
+				LastMonthCloseNPPod numeric(18,0),
+				LastMonthClosePersenNPPOD float)
+
+	create table #ODWilayah(
+				WilayahID varchar(2),
+				WilayahName varchar(25),
+				OpenNPPaktif numeric(18,0),
+				OpenNPPod numeric(18,0),
+				OpenPersenNPPOD float,
+				CloseNPPaktif numeric(18,0),
+				CloseNPPod numeric(18,0),
+				ClosePersenNPPOD float,
+				LastMonthOpenNPPaktif numeric(18,0),
+				LastMonthOpenNPPod numeric(18,0),
+				LastMonthOpenPersenNPPOD float,
+				LastMonthCloseNPPaktif numeric(18,0),
+				LastMonthCloseNPPod numeric(18,0),
+				LastMonthClosePersenNPPOD float)
+	
+	create table #ODRegional(
+				RegionalID varchar(2),
+				RegionalName varchar(40),
+				OpenNPPaktif numeric(18,0),
+				OpenNPPod numeric(18,0),
+				OpenPersenNPPOD float,
+				CloseNPPaktif numeric(18,0),
+				CloseNPPod numeric(18,0),
+				ClosePersenNPPOD float,
+				LastMonthOpenNPPaktif numeric(18,0),
+				LastMonthOpenNPPod numeric(18,0),
+				LastMonthOpenPersenNPPOD float,
+				LastMonthCloseNPPaktif numeric(18,0),
+				LastMonthCloseNPPod numeric(18,0),
+				LastMonthClosePersenNPPOD float)
+
+	create table #ODArea(
+				AreaID varchar(2),
+				AreaName varchar(30),
+				OpenNPPaktif numeric(18,0),
+				OpenNPPod numeric(18,0),
+				OpenPersenNPPOD float,
+				CloseNPPaktif numeric(18,0),
+				CloseNPPod numeric(18,0),
+				ClosePersenNPPOD float,
+				LastMonthOpenNPPaktif numeric(18,0),
+				LastMonthOpenNPPod numeric(18,0),
+				LastMonthOpenPersenNPPOD float,
+				LastMonthCloseNPPaktif numeric(18,0),
+				LastMonthCloseNPPod numeric(18,0),
+				LastMonthClosePersenNPPOD float)
+
+	create table #ODBranch(
+				BranchID varchar(100),
+				BranchName varchar(100),
+				OpenNPPaktif numeric(18,0),
+				OpenNPPod numeric(18,0),
+				OpenPersenNPPOD float,
+				CloseNPPaktif numeric(18,0),
+				CloseNPPod numeric(18,0),
+				ClosePersenNPPOD float,
+				LastMonthOpenNPPaktif numeric(18,0),
+				LastMonthOpenNPPod numeric(18,0),
+				LastMonthOpenPersenNPPOD float,
+				LastMonthCloseNPPaktif numeric(18,0),
+				LastMonthCloseNPPod numeric(18,0),
+				LastMonthClosePersenNPPOD float)
+	
+
+	Select b.branchid, b.branchName,a.areaid,a.areaname,r.regionalid,r.wilayahid,r.wilayahname
+		   Into #tempRegional
+		   From [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.SysGFCompanyBranch b
+				Inner join [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.SysGFCompanyArea a on b.areaid=a.areaid and b.CompanyID=a.CompanyID
+				Inner join [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.SysGFCompanyRegional r on a.regionalid=r.regionalid and r.CompanyID=a.CompanyID
+				Inner join [MACF-DBSTG].DUMP_MACF.dbo.SYSGFCompanyBranchR2_Oct22 br on br.BranchId=b.BranchId --add by Eka 20 Oct 2022
+				WHERE a.IsActive='1' and b.IsActive='1'
+					and r.WilayahID in ('1','2','6')
+					and r.RegionalID not in ('1','18','27','7','28')--add by yohan (Regional id '28')
+
+
+	IF DATEPART(HOUR,GETDATE())='0'
+		begin
+			set @CurrDate=getdate()-1
+		end
+	else
+		begin
+			set @CurrDate=getdate()
+		end
+
+
+    set @mtdThisMonth = convert(varchar(8),@CurrDate,112)
+
+	if @mtdThisMonth=convert(varchar(8),eomonth(@CurrDate),112) 
+	   begin
+	      select @mtdlastMonth = convert(varchar(8),eomonth(dateadd(m,-1,@mtdThisMonth)),112)
+		    --select @mtdlastMonth = convert(varchar(8),eomonth(dateadd(m,-5,@mtdThisMonth)),112) --20240513 Req Risk 
+	   end
+    else
+	   begin
+	      select @mtdlastMonth = convert(varchar(8),dateadd(m,-1,@mtdThisMonth),112)
+		    --select @mtdlastMonth = convert(varchar(8),dateadd(m,-5,@mtdThisMonth),112) --20240513 Req Risk 
+	   end
+
+
+--select @mtdlastMonth
+
+	----------  MCF -----------
+	insert into #odMCF (WilayahID,WilayahName,RegionalID,AreaID,AreaName,BranchID,nppno,approvedate,OP) 
+	select d.WilayahID,d.WilayahName,d.RegionalID,d.AreaID,d.AreaName, a.BranchID, a.nppno, a.Approvedate, b.op
+		   from [MACF-DBSTG].[REPL_DBMCF_EPMCF].dbo.npp a with(nolock)
+				left join [MACF-DBSTG].[REPL_DBMCF_EPMCF].dbo.cm b with(nolock) on a.nppno=b.NPPNo
+				left Join [MACF-DBSTG].[REPL_DBMCF_EPMCF].dbo.InsClaim c with(nolock) on a.NPPNo = c.NPPNo  
+				left join #tempRegional d with(nolock)on a.BranchId=d.BranchId
+		 	    where b.status='1' and convert(char,a.approvedate,112)<=convert(char,@CurrDate,112) and a.StatusNpp='A' 
+				      and a.ApproveDate is not null 
+					  --and d.RegionalID is not null
+					  and isnull(c.StatusClaim,'')=''
+					  and isNull(a.IsInActive,0) = 0  
+
+
+	update od 
+		set DeadLine=CollectionDate
+	from  #odMCF od
+	inner join 
+	(
+		select nppno, CollectionDate=min(CollectionDate)
+		from [MACF-DBSTG].[REPL_DBMCF_ECol].dbo.ec_arcard with(nolock)
+		where convert(char,CollectionDate,112)<=convert(char,@CurrDate,112)
+			and PayDate is null
+		group by nppno
+	) ar on od.nppno=ar.nppno
+
+				 
+	update od 
+		set LastPaydate=@CurrDate
+	from #odMCF od
+	where DeadLine is not null
+
+	update od 
+		set od=datediff(day,isnull(DeadLine,@CurrDate),isnull(LastPaydate,@CurrDate))
+	from #odMCF od
+
+	select @TotRecordMCF=count(*) from #odMCF where RegionalID is not null
+	select @TotODMCF=count(*) from #odMCF where od>0 and RegionalID is not null
+	set @TotPersenODMCF =  round(CAST(@TotODMCF as float)/CAST(@TotRecordMCF as float)*100,2)
+
+
+	----------  MAF -----------
+	insert into #odMAF (WilayahID,WilayahName,RegionalID,AreaID,AreaName,BranchID,nppno,approvedate,OP) 
+	select d.WilayahID,d.WilayahName,d.RegionalID,d.AreaID,d.AreaName,a.BranchID, a.nppno, a.Approvedate, b.op
+		   from [MACF-DBSTG].[REPL_DBMAF_EPMAF].dbo.npp a with(nolock)
+				left join [MACF-DBSTG].[REPL_DBMAF_EPMAF].dbo.cm b with(nolock) on a.nppno=b.NPPNo
+				left Join [MACF-DBSTG].[REPL_DBMAF_EPMAF].dbo.InsClaim c with(nolock) on a.NPPNo = c.NPPNo  
+				left join #tempRegional d with(nolock)on a.BranchId=d.BranchId
+		 	    where b.status='1' and convert(char,a.approvedate,112)<=convert(char,@CurrDate,112) and a.StatusNpp='A' 
+				      and a.ApproveDate is not null 
+					  and isnull(c.StatusClaim,'')='' 
+					  and isNull(a.IsInActive,0) = 0  
+
+	update od 
+		set DeadLine=CollectionDate
+	from  #odMAF od
+	inner join 
+	(
+		select nppno, CollectionDate=min(CollectionDate)
+		from [MACF-DBSTG].[REPL_DBMAF_ECol].dbo.ec_arcard with(nolock)
+		where convert(char,CollectionDate,112)<=convert(char,@CurrDate,112)
+			and PayDate is null
+		group by nppno
+	) ar on od.nppno=ar.nppno
+
+
+	update od 
+		set LastPaydate=@CurrDate
+	from #odMAF od
+	where DeadLine is not null
+
+	update od 
+		set od=datediff(day,isnull(DeadLine,@CurrDate),isnull(LastPaydate,@CurrDate))
+	from #odMAF od
+
+	select @TotRecordMAF=count(*) from #odMAF where RegionalID is not null
+	select @TotODMAF=count(*) from #odMAF where od>0 and RegionalID is not null
+	set @TotPersenODMAF =  round(CAST(@TotODMAF as float)/CAST(@TotRecordMAF as float)*100,2)
+
+	
+	----------- Nasional ------------
+
+	select @TotRecordNasional = @TotRecordMCF+@TotRecordMAF
+	select @TotODNasional = @TotODMCF+@TotODMAF
+	set @TotPersenODNasional = round(CAST(@TotODNasional as float)/CAST(@TotRecordNasional as float)*100,2)
+
+
+
+	------------- Query Open OD -----------------
+	 
+	select @OpenNPPaktifMAF=sum(NPPAktif), @OpenNPPODMAF=sum(NPPOD), @OpenPersenNPPODMAF=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))  
+	from ODHistoryHeader with(nolock)
+	where convert(varchar(8),oddate,112)=convert(varchar(8),@CurrDate,112)
+		and Type='R' and OpenClose=1 and PT='2'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+
+	select @OpenNPPaktifMCF=sum(NPPAktif), @OpenNPPODMCF=sum(NPPOD), @OpenPersenNPPODMCF=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))    
+	from ODHistoryHeader with(nolock)
+	where convert(varchar(8),oddate,112)=convert(varchar(8),@CurrDate,112)
+		and Type='R' and OpenClose=1 and PT='3'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+
+	select @OpenNPPaktifNasional = @OpenNPPaktifMAF+@OpenNPPaktifMCF
+	select @OpenNPPODNasional = @OpenNPPODMAF+@OpenNPPODMCF
+	set @OpenPersenNPPODNasional = round(CAST(@OpenNPPODNasional as float)/CAST(@OpenNPPaktifNasional as float)*100,2)
+
+
+	----- Today -----
+	insert into #ODPT(PT, OpenNPPaktif, OpenNPPod, OpenPersenNPPOD, CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+		   values('MAF', @OpenNPPaktifMAF, @OpenNPPODMAF, @OpenPersenNPPODMAF, @TotRecordMAF,@TotODMAF,@TotPersenODMAF)
+
+	insert into #ODPT(PT, OpenNPPaktif, OpenNPPod, OpenPersenNPPOD, CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+		   values('MCF', @OpenNPPaktifMCF, @OpenNPPODMCF, @OpenPersenNPPODMCF, @TotRecordMCF,@TotODMCF,@TotPersenODMCF)
+
+	insert into #ODPT(PT, OpenNPPaktif, OpenNPPod, OpenPersenNPPOD, CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+		   values('NASIONAL', @OpenNPPaktifNasional, @OpenNPPODNasional, @OpenPersenNPPODNasional, @TotRecordNasional,@TotODNasional,@TotPersenODNasional)
+	
+
+	 
+
+
+	----- LastMonth -----
+	set @sql = '
+	select * from (
+	select PT=iif(PT = 2,''MAF'',''MCF'')
+	, LastMonthOpenNPPaktif    = sum(iif(openclose = 1, 1, 0))
+	, LastMonthOpenNPPod       = sum(iif(openclose = 1 and od.od>0, 1, 0))
+	, LastMonthOpenPersenNPPOD = cast(sum(iif(openclose = 1 and od.od>0, 1, 0))*100.00/iif(sum(iif(openclose = 1, 1, 0))=0,1,sum(iif(openclose = 1, 1, 0))) as numeric(18,2))
+	, LastMonthCloseNPPaktif   = sum(iif(openclose = 0, 1, 0))
+	, LastMonthCloseNPPod	   = sum(iif(openclose = 0 and od.od>0, 1, 0))
+	, LastMonthClosePersenNPPOD= cast(sum(iif(openclose = 0 and od.od>0, 1, 0))*100.00/iif(sum(iif(openclose = 0, 1, 0))=0,1,sum(iif(openclose = 0, 1, 0))) as numeric(18,2))
+		from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+			inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+		where oddate=convert(varchar(8),'+@mtdlastMonth+',112) --and OpenClose=''1''
+			and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')
+		group by od.pt
+	union
+	select ''NASIONAL''
+	, LastMonthOpenNPPaktif    = sum(iif(openclose = 1, 1, 0))
+	, LastMonthOpenNPPod       = sum(iif(openclose = 1 and od.od>0, 1, 0))
+	, LastMonthOpenPersenNPPOD = cast(sum(iif(openclose = 1 and od.od>0, 1, 0))*100.00/iif(sum(iif(openclose = 1, 1, 0))=0,1,sum(iif(openclose = 1, 1, 0))) as numeric(18,2))
+	, LastMonthCloseNPPaktif   = sum(iif(openclose = 0, 1, 0))
+	, LastMonthCloseNPPod	   = sum(iif(openclose = 0 and od.od>0, 1, 0))
+	, LastMonthClosePersenNPPOD= cast(sum(iif(openclose = 0 and od.od>0, 1, 0))*100.00/iif(sum(iif(openclose = 0, 1, 0))=0,1,sum(iif(openclose = 0, 1, 0))) as numeric(18,2))
+		from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+			inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+		where oddate=convert(varchar(8),'+@mtdlastMonth+',112) --and OpenClose=''1''
+			and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')
+	) a order by pt
+	'
+	insert into #ODPT(PT, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD
+						, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	exec (@SQL)
+
+	/*
+	insert into #ODPT(PT, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select PT='MAF', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), PersenNPPOD=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))
+	from ODHistoryHeader with(nolock)
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=1 and PT='2'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+	
+	insert into #ODPT(PT, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select PT='MAF', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), PersenNPPOD=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))
+	from ODHistoryHeader with(nolock)
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=0 and PT='2'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+
+	insert into #ODPT(PT, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select PT='MCF', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), PersenNPPOD=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))
+	from ODHistoryHeader with(nolock)
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=1 and PT='3'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+	
+	insert into #ODPT(PT, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+		select PT='MCF', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), PersenNPPOD=cast(sum(NPPOD)*100/sum(NPPAktif) as numeric(18,2))
+	from ODHistoryHeader with(nolock)
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=0 and PT='3'
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+	
+	insert into #ODPT(PT, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select PT='NASIONAL', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), 
+		PersenNPPOD=round(CAST(sum(NPPOD) as float)/CAST(sum(NPPAktif) as float)*100,2)
+	from ODHistoryHeader
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=1
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+	
+	insert into #ODPT(PT, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select PT='NASIONAL', NPPAktif=sum(NPPAktif), NPPOD=sum(NPPOD), 
+	      PersenNPPOD=round(CAST(sum(NPPOD) as float)/CAST(sum(NPPAktif) as float)*100,2)
+	from ODHistoryHeader
+	where oddate=@mtdlastMonth
+		and Type='R' and OpenClose=0
+		and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+	*/
+	select * from ODHistoryDetail_202503
+	select idx=identity(int,1,1),PT, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPod=sum(OpenNPPod), OpenPersenNPPOD=sum(OpenPersenNPPOD), 
+	       CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD),
+		   LastMonthOpenNPPaktif=sum(LastMonthOpenNPPaktif), LastMonthOpenNPPod=sum(LastMonthOpenNPPod), 
+		   LastMonthOpenPersenNPPOD=sum(LastMonthOpenPersenNPPOD), LastMonthCloseNPPaktif=sum(LastMonthCloseNPPaktif), 
+		   LastMonthCloseNPPod=sum(LastMonthCloseNPPod), LastMonthClosePersenNPPOD=sum(LastMonthClosePersenNPPOD)  
+		   into #ODPTtemp
+		   from #ODPT 
+				group by PT
+	
+
+	--select * from #ODPTtemp
+
+	---------------------------------------------------------------------------------------------------------
+	----------------------------------------------------- WILAYAH ------------------------------------------
+	---------------------------------------------------------------------------------------------------------
+
+	------ Query Open & Close OD Wilayah Today ------
+
+	insert into #ODWilayah (WilayahID, WilayahName, OpenNPPaktif, OpenNPPOd, OpenPersenNPPOD,
+							 CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+	select WilayahID,WilayahName, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPOd=sum(OpenNPPOd), OpenPersenNPPOD=sum(OpenPersenNPPOD),
+	CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD)
+	From
+	(
+	select WilayahID,WilayahName, OpenNPPaktif=0, OpenNPPOd=0, OpenPersenNPPOD=0, 
+			CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod),
+			ClosePersenNPPOD = round(CAST(sum(CloseNPPod) as float)/CAST(sum(CloseNPPaktif) as float)*100,2)	 
+			from 
+			(
+				select WilayahID,WilayahName, CloseNPPaktif=count(*), CloseNPPod=0 
+				from #odMAF 
+				group by WilayahID,WilayahName
+			Union all
+				select WilayahID,WilayahName, CloseNPPaktif=0, CloseNPPod=count(*) 
+				from #odMAF 
+				where od>0 
+				group by WilayahID,WilayahName
+			Union all
+				select WilayahID,WilayahName, CloseNPPaktif=count(*), CloseNPPod=0 
+				from #odMCF 
+				group by WilayahID,WilayahName
+			Union all
+			select WilayahID,WilayahName, CloseNPPaktif=0, CloseNPPod=count(*) 
+				from #odMCF 
+				where od>0 
+				group by WilayahID,WilayahName
+			) a
+			group by WilayahID,WilayahName
+	union all
+	select r.WilayahID,r.WilayahName, OpenNPPaktif=sum(NPPAktif), OpenNPPOd=sum(NPPOD), 
+			OpenPersenNPPOD = round(CAST(sum(NPPOD) as float)/CAST(sum(NPPAktif) as float)*100,2),
+			CloseNPPaktif=0, CloseNPPod=0, ClosePersenNPPOD=0
+	from odhistoryheader od with(nolock) 
+		inner join 
+		(
+			select distinct regionalid,wilayahID,wilayahName 
+			From #tempRegional with(nolock)
+		) r on od.RegionalID=r.RegionalID
+	where type='R' and convert(varchar(8),oddate,112)=convert(varchar(8),@CurrDate,112) 
+		and OpenClose='1'
+		and r.RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28') 05/09/2024
+	group by r.WilayahID,r.WilayahName
+	
+	)Qry
+	Where WilayahID is not null
+	Group By WilayahID,WilayahName
+
+	--select * from #odwilayah
+
+	
+	------ Query Open & Close OD Wilayah LastMonth ------
+	set @sql='
+	insert into #ODWilayah(WilayahID,WilayahName, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select r.WilayahID
+		, r.WilayahName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''1''
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.WilayahID, r.WilayahName
+	
+	insert into #ODWilayah(WilayahID,WilayahName, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select r.WilayahID
+		, r.WilayahName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''0'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.WilayahID, r.WilayahName
+	'
+	exec (@sql)
+
+	--select * from #ODWilayah
+	--select top 1 * from ODHistoryDetail_202212
+
+	
+	select idx=identity(int,1,1), WilayahID, Wilayahname, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPod=sum(OpenNPPod), OpenPersenNPPOD=sum(OpenPersenNPPOD), 
+	       CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD),
+		   LastMonthOpenNPPaktif=sum(LastMonthOpenNPPaktif), LastMonthOpenNPPod=sum(LastMonthOpenNPPod), 
+		   LastMonthOpenPersenNPPOD=sum(LastMonthOpenPersenNPPOD), LastMonthCloseNPPaktif=sum(LastMonthCloseNPPaktif), 
+		   LastMonthCloseNPPod=sum(LastMonthCloseNPPod), LastMonthClosePersenNPPOD=sum(LastMonthClosePersenNPPOD)  
+	into #ODWilayahtemp
+	from #ODWilayah 
+	group by WilayahID,Wilayahname
+	order by cast(WilayahID as int)
+	
+
+	---------------------------------------------------------------------------------------------------------
+	----------------------------------------------------- Regional ------------------------------------------
+	---------------------------------------------------------------------------------------------------------
+
+	------ Query Open & Close OD Regional Today ------
+
+	insert into #ODRegional (RegionalID, OpenNPPaktif, OpenNPPOd, OpenPersenNPPOD,
+							 CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+	select RegionalID, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPOd=sum(OpenNPPOd), OpenPersenNPPOD=sum(OpenPersenNPPOD),
+	CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD)
+	From
+	(
+		select RegionalID, OpenNPPaktif=0, OpenNPPOd=0, OpenPersenNPPOD=0, 
+				CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod),
+				ClosePersenNPPOD = round(CAST(sum(CloseNPPod) as float)/CAST(sum(CloseNPPaktif) as float)*100,2)	 
+				from 
+				(
+					select RegionalID, CloseNPPaktif=count(*), CloseNPPod=0 from #odMAF group by RegionalID
+					Union all
+					select RegionalID, CloseNPPaktif=0, CloseNPPod=count(*) from #odMAF where od>0 group by RegionalID
+					Union all
+					select RegionalID, CloseNPPaktif=count(*), CloseNPPod=0 from #odMCF group by RegionalID
+					Union all
+					select RegionalID, CloseNPPaktif=0, CloseNPPod=count(*) from #odMCF where od>0 group by RegionalID
+				) a
+				group by RegionalID
+		union all
+		select RegionalID, OpenNPPaktif=sum(NPPAktif), OpenNPPOd=sum(NPPOD), 
+				OpenPersenNPPOD = round(CAST(sum(NPPOD) as float)/CAST(sum(NPPAktif) as float)*100,2),
+				CloseNPPaktif=0, CloseNPPod=0, ClosePersenNPPOD=0
+		from odhistoryheader 
+		where type='R' and convert(varchar(8),oddate,112)=convert(varchar(8),@CurrDate,112) 
+			and OpenClose='1'
+			and RegionalID not in ('8','0','1','18','27','7','28')--add by yohan (Regional id '28')
+		group by RegionalID
+	)Qry
+	where RegionalID<>'8' And RegionalID<>'0'
+	Group By RegionalID
+
+	--select * from #odRegional
+	
+	------ Query Open & Close OD Regional LastMonth ------
+	set @sql='
+	insert into #ODRegional(RegionalID, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select r.RegionalID
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''1''
+		and od.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.RegionalID
+	
+	insert into #ODRegional(RegionalID, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select r.RegionalID
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''0''
+		and od.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.RegionalID
+	'
+	exec (@sql)
+
+
+	select idx=identity(int,1,1), RegionalID, Regionalname=space(30), OpenNPPaktif=sum(OpenNPPaktif), OpenNPPod=sum(OpenNPPod), OpenPersenNPPOD=sum(OpenPersenNPPOD), 
+	       CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD),
+		   LastMonthOpenNPPaktif=sum(LastMonthOpenNPPaktif), LastMonthOpenNPPod=sum(LastMonthOpenNPPod), 
+		   LastMonthOpenPersenNPPOD=sum(LastMonthOpenPersenNPPOD), LastMonthCloseNPPaktif=sum(LastMonthCloseNPPaktif), 
+		   LastMonthCloseNPPod=sum(LastMonthCloseNPPod), LastMonthClosePersenNPPOD=sum(LastMonthClosePersenNPPOD)  
+	into #ODRegionaltemp
+	from #ODRegional 
+	group by RegionalID
+	order by cast(RegionalID as int)
+
+
+	update a 
+		set a.RegionalName=b.RegionalName
+	from #ODRegionaltemp a
+	join (select RegionalID,RegionalName from [MACF-DBSTG].[REPL_DBMCF_EPMCF].dbo.msregional where RegionalID not in ('8','0','1','18','27','7','28')) b --add conds by Eka 19 Jan 2023 --add by yohan (Regional id 28) 05/09/2024
+	on a.RegionalID=b.RegionalID
+
+
+	--select * from #ODRegionaltemp
+
+	---------------------------------------------------------------------------------------------------------
+	------------------------------------------------------- AREA --------------------------------------------
+	---------------------------------------------------------------------------------------------------------
+	
+	------ Query Open OD Area This Month ------
+
+	set @sql = '
+	insert into #ODArea(AreaID, AreaName, OpenNPPaktif, OpenNPPod, OpenPersenNPPOD)
+	select r.AreaID
+		, r.AreaName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdThismonth+',112) and OpenClose=''1'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.AreaID, r.AreaName
+	
+	' exec (@sql)
+
+	--select * from #odArea
+
+
+	------ Query Close OD Area This Month ------
+
+	insert into #ODArea (AreaID, AreaName,CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+	select AreaID, AreaName, CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD)
+	From (
+		select AreaID, AreaName, OpenNPPaktif=0, OpenNPPOd=0, OpenPersenNPPOD=0, 
+		CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod),
+		ClosePersenNPPOD = round(CAST(sum(CloseNPPod) as float)/CAST(sum(CloseNPPaktif) as float)*100,2)	 
+		from 
+		(
+			select AreaID, AreaName, CloseNPPaktif=count(*), CloseNPPod=0 
+			from #odMAF 
+			where RegionalID<>'8'
+			group by AreaID, AreaName
+		Union all
+			select AreaID, AreaName, CloseNPPaktif=0, CloseNPPod=count(*) 
+			from #odMAF 
+			where od>0 
+			and RegionalID<>'8'
+			group by AreaID, AreaName
+		Union all
+			select AreaID, AreaName, CloseNPPaktif=count(*), CloseNPPod=0 
+			from #odMCF 
+			where RegionalID<>'8'
+			group by AreaID, AreaName
+		Union all
+		select AreaID, AreaName, CloseNPPaktif=0, CloseNPPod=count(*) 
+			from #odMCF 
+			where od>0 
+			and RegionalID<>'8'
+			group by AreaID, AreaName
+		) a
+		group by AreaID, AreaName
+	)Qry 
+	group by AreaID, AreaName
+
+
+	------ Query Open & Close OD Area LastMonth ------
+
+	set @sql='
+	insert into #ODArea(AreaID, AreaName, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select r.AreaID
+		, r.AreaName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''1'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.AreaID, r.AreaName
+	
+	insert into #ODArea(AreaID, AreaName, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select r.AreaID
+		, r.AreaName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''0'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.AreaID, r.AreaName
+	'
+	exec (@sql)
+
+
+	select idx=identity(int,1,1), AreaID, AreaName, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPod=sum(OpenNPPod), OpenPersenNPPOD=sum(OpenPersenNPPOD), 
+	       CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD),
+		   LastMonthOpenNPPaktif=sum(LastMonthOpenNPPaktif), LastMonthOpenNPPod=sum(LastMonthOpenNPPod), 
+		   LastMonthOpenPersenNPPOD=sum(LastMonthOpenPersenNPPOD), LastMonthCloseNPPaktif=sum(LastMonthCloseNPPaktif), 
+		   LastMonthCloseNPPod=sum(LastMonthCloseNPPod), LastMonthClosePersenNPPOD=sum(LastMonthClosePersenNPPOD)  
+	into #ODAreatemp
+	from #ODArea 
+	group by AreaID,AreaName
+	order by cast(AreaID as int)
+
+	---------------------------------------------------------------------------------------------------------
+	------------------------------------------------------- Branch --------------------------------------------
+	---------------------------------------------------------------------------------------------------------
+	
+	------ Query Open OD Branch This Month ------
+
+	set @sql = '
+	insert into #ODBranch(BranchID, BranchName, OpenNPPaktif, OpenNPPod, OpenPersenNPPOD)
+	select r.BranchID
+		, r.BranchName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdThismonth+',112) and OpenClose=''1'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.BranchID, r.BranchName
+	
+	' exec (@sql)
+
+	--select * from #odBranch
+
+
+	------ Query Close OD Branch This Month ------
+
+	insert into #ODBranch (BranchID, BranchName,CloseNPPaktif, CloseNPPod, ClosePersenNPPOD)
+	select BranchID, BranchName, CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD)
+	From (
+		select BranchID, BranchName, OpenNPPaktif=0, OpenNPPOd=0, OpenPersenNPPOD=0, 
+		CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod),
+		ClosePersenNPPOD = round(CAST(sum(CloseNPPod) as float)/CAST(sum(CloseNPPaktif) as float)*100,2)	 
+		from 
+		(
+			select d.BranchID, r.BranchName, CloseNPPaktif=count(*), CloseNPPod=0 
+			from #odMAF d
+			left join #tempRegional r on r.branchID = d.BranchID
+			where d.RegionalID<>'8'
+			group by d.BranchID, r.BranchName
+		Union all
+			select d.BranchID, r.BranchName, CloseNPPaktif=0, CloseNPPod=count(*) 
+			from #odMAF d
+			left join #tempRegional r on r.branchID = d.BranchID
+			where d.od>0 
+			and d.RegionalID<>'8'
+			group by d.BranchID, r.BranchName
+		Union all
+			select d.BranchID, r.BranchName, CloseNPPaktif=count(*), CloseNPPod=0 
+			from #odMCF d
+			left join #tempRegional r on r.branchID = d.BranchID
+			where d.RegionalID<>'8'
+			group by d.BranchID, r.BranchName
+		Union all
+		select d.BranchID, r.BranchName, CloseNPPaktif=0, CloseNPPod=count(*) 
+			from #odMCF d
+			left join #tempRegional r on r.branchID = d.BranchID
+			where d.od>0 
+			and d.RegionalID<>'8'
+			group by d.BranchID, r.BranchName
+		) a
+		group by BranchID, BranchName
+	)Qry 
+	group by BranchID, BranchName
+
+
+	------ Query Open & Close OD Branch LastMonth ------
+
+	set @sql='
+	insert into #ODBranch(BranchID, BranchName, LastMonthOpenNPPaktif, LastMonthOpenNPPod, LastMonthOpenPersenNPPOD)
+	select r.BranchID
+		, r.BranchName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''1'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.BranchID, r.BranchName
+	
+	insert into #ODBranch(BranchID, BranchName, LastMonthCloseNPPaktif, LastMonthCloseNPPod, LastMonthClosePersenNPPOD)
+	select r.BranchID
+		, r.BranchName
+		, NPPAktif=count(od.NppNo)
+		, NPPOD=sum(case when od.od>0 Then 1 else 0 end)
+		, PersenNPPOD=round(cast(sum(case when od.od>0 Then 1 else 0 end) as float) / cast(count(od.NppNo) as float)*100,2)
+	from ODHistoryDetail_'+left(@mtdlastMonth,6)+' od with(nolock) 
+		inner join #tempRegional r with(nolock) on od.branchid=r.branchid
+	where oddate=convert(varchar(8),'+@mtdlastMonth+',112) and OpenClose=''0'' 
+		and r.RegionalID not in (''8'',''0'',''1'',''18'',''27'',''7'',''28'')--add by yohan (Regional id 28) 05/09/2024
+	group by r.BranchID, r.BranchName
+	'
+	exec (@sql)
+
+
+	select idx=identity(int,1,1), BranchID, BranchName, OpenNPPaktif=sum(OpenNPPaktif), OpenNPPod=sum(OpenNPPod), OpenPersenNPPOD=sum(OpenPersenNPPOD), 
+	       CloseNPPaktif=sum(CloseNPPaktif), CloseNPPod=sum(CloseNPPod), ClosePersenNPPOD=sum(ClosePersenNPPOD),
+		   LastMonthOpenNPPaktif=sum(LastMonthOpenNPPaktif), LastMonthOpenNPPod=sum(LastMonthOpenNPPod), 
+		   LastMonthOpenPersenNPPOD=sum(LastMonthOpenPersenNPPOD), LastMonthCloseNPPaktif=sum(LastMonthCloseNPPaktif), 
+		   LastMonthCloseNPPod=sum(LastMonthCloseNPPod), LastMonthClosePersenNPPOD=sum(LastMonthClosePersenNPPOD)  
+	into #ODBranchtemp
+	from #ODBranch 
+	group by BranchID,BranchName
+	order by cast(BranchID as int)
+
+--INSERT KE TABEL FISIK add by yohan 10/09/2024
+TRUNCATE TABLE TB_MPX_Jaringan_LaporanOD
+insert into TB_MPX_Jaringan_LaporanOD
+ SELECT 
+		 c.BranchID,
+         ParentBranch = CASE WHEN c.branchname LIKE '%Bandar Lampung%' OR c.branchname LIKE'%Batam%' THEN UPPER(c.branchname)
+						ELSE UPPER(REPLACE(REPLACE(c.branchname, 'MCF',''), 'MAF', ''))
+						END,
+		 BranchName = CASE WHEN mb.BranchName2W LIKE '%Bandar Lampung%' OR mb.BranchName2W LIKE'%Batam%' THEN UPPER(isnull(mb.BranchName2W,c.branchname))
+		              ELSE UPPER(isnull(REPLACE(REPLACE(mb.BranchName2W, 'MCF',''), 'MAF', ''),REPLACE(REPLACE(c.branchname, 'MCF',''), 'MAF', '')))
+					  END,
+         OpenNPPaktif = ISNULL(SUM(OpenNPPaktif), 0),
+         OpenNPPod = ISNULL(SUM(OpenNPPod), 0),
+         OpenPersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(OpenNPPod), 0) AS float) / CAST(NULLIF(SUM(OpenNPPaktif), 0) AS float) * 100, 2),0),
+         CloseNPPaktif = ISNULL(SUM(CloseNPPaktif), 0),
+         CloseNPPod = ISNULL(SUM(CloseNPPod), 0),
+         ClosePersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(CloseNPPod), 0) AS float) / CAST(NULLIF(SUM(CloseNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthOpenNPPaktif = ISNULL(SUM(LastMonthOpenNPPaktif), 0),
+         LastMonthOpenNPPod = ISNULL(SUM(LastMonthOpenNPPod), 0),
+         LastMonthOpenPersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthOpenNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthOpenNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthCloseNPPaktif = ISNULL(SUM(LastMonthCloseNPPaktif), 0),
+         LastMonthCloseNPPod = ISNULL(SUM(LastMonthCloseNPPod), 0),
+         LastMonthClosePersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthCloseNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthCloseNPPaktif), 0) AS float) * 100, 2),0)
+		 FROM #odbranchtemp a
+         INNER JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch b with (nolock) ON b.BranchID = a.BranchID and b.isactive = 1
+         LEFT JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch c with (nolock) ON c.BranchID = b.KonsolBranchID
+	 	 LEFT JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.MsBranch mb with (nolock) on mb.Branchid=b.Branchid
+      --where c.branchname LIKE '%arga%' or c.branchname LIKE '%BANDUNG 2%'  or c.branchname LIKE '%Lampung%' or c.branchname LIKE '%Batam%' --WHERE a.branchid = '106'
+     GROUP BY c.BranchID,c.BranchName,mb.BranchName2W
+	 order by c.branchname
+
+	       
+     SELECT --yohan  populate data by konsolbranch 05/09/2024
+	     idx=identity(int,1,1),
+		 BranchID = c.BranchID,
+         ParentBranch = CASE WHEN c.branchname LIKE '%Bandar Lampung%' OR c.branchname LIKE'%Batam%' THEN UPPER(c.branchname)
+						ELSE UPPER(REPLACE(REPLACE(c.branchname, 'MCF',''), 'MAF', ''))
+						END,
+         OpenNPPaktif = ISNULL(SUM(OpenNPPaktif), 0),
+         OpenNPPod = ISNULL(SUM(OpenNPPod), 0),
+         OpenPersenNPPOD = ROUND(cast(ISNULL(SUM(OpenNPPod), 0) as float) / CAST(ISNULL(SUM(OpenNPPaktif), 0) as float)*100,2),
+         CloseNPPaktif = ISNULL(SUM(CloseNPPaktif), 0),
+         CloseNPPod = ISNULL(SUM(CloseNPPod), 0),
+         ClosePersenNPPOD = ROUND(cast(ISNULL(SUM(CloseNPPod), 0) as float) / CAST(ISNULL(SUM(CloseNPPaktif), 0) as float)*100,2),
+         LastMonthOpenNPPaktif = ISNULL(SUM(LastMonthOpenNPPaktif), 0),
+         LastMonthOpenNPPod = ISNULL(SUM(LastMonthOpenNPPod), 0),
+         LastMonthOpenPersenNPPOD = ROUND(cast(ISNULL(SUM(LastMonthOpenNPPod), 0) as float) / CAST(ISNULL(SUM(LastMonthOpenNPPaktif), 0) as float)*100,2),
+         LastMonthCloseNPPaktif = ISNULL(SUM(LastMonthCloseNPPaktif), 0),
+         LastMonthCloseNPPod = ISNULL(SUM(LastMonthCloseNPPod), 0),
+         LastMonthClosePersenNPPOD = ROUND(cast(ISNULL(SUM(LastMonthCloseNPPod), 0) as float) / CAST(ISNULL(SUM(LastMonthCloseNPPaktif), 0) as float)*100,2)
+      INTO #ODParentBranchTemp
+	  FROM TB_MPX_Jaringan_LaporanOD a
+     INNER JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch b with (nolock) ON b.BranchID = a.BranchID and b.isactive = '1'
+     LEFT JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch c with (nolock) ON c.BranchID = b.KonsolBranchID
+      --where c.branchname LIKE '%arga%' or c.branchname LIKE '%BANDUNG 2%'  or c.branchname LIKE '%Lampung%' or c.branchname LIKE '%Batam%' --WHERE a.branchid = '106'
+     GROUP BY c.BranchID,c.BranchName
+	 order by c.branchname
+
+
+/*sheila 20250305*/
+--------------------------------------cabang pos------------------------------------------------------------------
+SELECT 
+		 idx=identity(int,1,1),
+		 c.BranchID,
+		 BranchName = CASE WHEN mb.BranchName2W LIKE '%Bandar Lampung%' OR mb.BranchName2W LIKE'%Batam%' THEN UPPER(isnull(mb.BranchName2W,c.branchname))
+		              ELSE UPPER(isnull(REPLACE(REPLACE(mb.BranchName2W, 'MCF',''), 'MAF', ''),REPLACE(REPLACE(c.branchname, 'MCF',''), 'MAF', '')))
+					  END,
+         OpenNPPaktif = ISNULL(SUM(OpenNPPaktif), 0),
+         OpenNPPod = ISNULL(SUM(OpenNPPod), 0),
+         OpenPersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(OpenNPPod), 0) AS float) / CAST(NULLIF(SUM(OpenNPPaktif), 0) AS float) * 100, 2),0),
+         CloseNPPaktif = ISNULL(SUM(CloseNPPaktif), 0),
+         CloseNPPod = ISNULL(SUM(CloseNPPod), 0),
+         ClosePersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(CloseNPPod), 0) AS float) / CAST(NULLIF(SUM(CloseNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthOpenNPPaktif = ISNULL(SUM(LastMonthOpenNPPaktif), 0),
+         LastMonthOpenNPPod = ISNULL(SUM(LastMonthOpenNPPod), 0),
+         LastMonthOpenPersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthOpenNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthOpenNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthCloseNPPaktif = ISNULL(SUM(LastMonthCloseNPPaktif), 0),
+         LastMonthCloseNPPod = ISNULL(SUM(LastMonthCloseNPPod), 0),
+         LastMonthClosePersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthCloseNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthCloseNPPaktif), 0) AS float) * 100, 2),0)
+		 INTO #ODcabangpos
+		 FROM #odbranchtemp a
+         INNER JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch b with (nolock) ON b.BranchID = a.BranchID and b.isactive = 1
+         LEFT JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.sysgfcompanybranch c with (nolock) ON c.BranchID = b.KonsolBranchID
+	 	 LEFT JOIN [MACF-DBSTG].[REPL_DBMCF_MACFDB].dbo.MsBranch mb with (nolock) on mb.Branchid=b.Branchid
+      --where c.branchname LIKE '%arga%' or c.branchname LIKE '%BANDUNG 2%'  or c.branchname LIKE '%Lampung%' or c.branchname LIKE '%Batam%' --WHERE a.branchid = '106'
+	 GROUP BY c.BranchID,c.BranchName,mb.BranchName2W
+	 order by c.branchname
+
+
+select  
+         idx=identity(int,1,1),
+		 BranchID,
+         Branchname,
+         OpenNPPaktif = ISNULL(SUM(OpenNPPaktif), 0),
+         OpenNPPod = ISNULL(SUM(OpenNPPod), 0),
+         OpenPersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(OpenNPPod), 0) AS float) / CAST(NULLIF(SUM(OpenNPPaktif), 0) AS float) * 100, 2),0),
+         CloseNPPaktif = ISNULL(SUM(CloseNPPaktif), 0),
+         CloseNPPod = ISNULL(SUM(CloseNPPod), 0),
+         ClosePersenNPPOD =  ISNULL(ROUND(CAST(ISNULL(SUM(CloseNPPod), 0) AS float) / CAST(NULLIF(SUM(CloseNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthOpenNPPaktif = ISNULL(SUM(LastMonthOpenNPPaktif), 0),
+         LastMonthOpenNPPod = ISNULL(SUM(LastMonthOpenNPPod), 0),
+         LastMonthOpenPersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthOpenNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthOpenNPPaktif), 0) AS float) * 100, 2),0),
+         LastMonthCloseNPPaktif = ISNULL(SUM(LastMonthCloseNPPaktif), 0),
+         LastMonthCloseNPPod = ISNULL(SUM(LastMonthCloseNPPod), 0),
+         LastMonthClosePersenNPPOD = ISNULL(ROUND(CAST(ISNULL(SUM(LastMonthCloseNPPod), 0) AS float) / CAST(NULLIF(SUM(LastMonthCloseNPPaktif), 0) AS float) * 100, 2),0)
+
+into #cabangpostemp
+from #ODcabangpos
+GROUP BY BranchID,Branchname
+/*sheila 20250305*/
+
+
+
+
+	delete from [macf-dbstg].DUMP_MACF.dbo.tb_MPX_Laporan_OD
+	insert into [macf-dbstg].DUMP_MACF.dbo.tb_MPX_Laporan_OD
+	select zone='PT'      ,'',*, getdate() from #ODPTTemp
+	union all select zone='Wilayah' ,*, getdate() from #ODWilayahtemp
+	union all select zone='Regional',*, getdate() from #ODRegionaltemp
+	union all select zone='Area'    ,*, getdate() from #ODAreatemp
+	union all select zone='Branch'  ,*, getdate() from #ODBranchtemp
+
+
+
+------------------------------------------------------------------------------------------------------
+	set @Pemisah=char(13)+char(10)
+	set @MsgBody1 = ''
+	set @MsgBody2 = ''
+	set @MsgBody3 = ''
+	set @MsgBody4 = ''
+	set @MsgBody5 = '' --add by yohan 05/09/2024
+	set @MsgBody6 = '' -- add by syila 04/03/2025
+
+
+	set @MsgHdr1='<html>
+                <head>
+                    <style type="text/css">
+                        .table{
+                            background-color: #F5F5F5;
+                            border-collapse: collapse;
+                            font-size: 12px;
+                            font-family: "Verdana";}
+
+                        .table .title{
+                            text-align: center;
+                            background-color: #3399FF;
+                            color:white;
+                            font-weight:bold;}
+
+                        .table .head{
+                            text-align: center;
+                            background-color: #FFCC00;}
+						
+                        .table td{
+                            padding : 5px;
+                            border  : solid 1px #555;
+							font-weight:normal;}
+                        
+						.table .bad{
+						    text-align: center;
+                            background-color: #DC143C;}
+						
+						.table .good{
+						    text-align: center;
+                            background-color: #7FFF00;}
+												
+						.table .important{
+						    text-align: center;
+                            background-color: #Cad3e7;}
+        </style>
+                </head>
+
+                <body>
+                    <!-- TABLE OD -->
+					<br>
+                    <table ID="OD" class="table">
+					    <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By PT </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head" style="width:79"> <b> PT </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  						
+						</tr>
+            '
+
+
+			----- OD by PT MAF & MCF -----
+
+			select @TotRec=count(*) from #ODPTtemp where PT in ('MAF','MCF')
+			set @CurrRec=1
+
+			while @CurrRec <= @TotRec
+				BEGIN					
+					select @PT=PT, @OpenNPPAktif=OpenNPPAktif, @OpenNPPOD=OpenNPPOD, 
+						   @OpenPersenNPPOD=OpenPersenNPPOD, @CloseNPPAktif=CloseNPPAktif, 
+						   @CloseNPPOD=CloseNPPOD, @ClosePersenNPPOD=ClosePersenNPPOD,
+						   @LastMonthOpenNPPaktif=LastMonthOpenNPPaktif, @LastMonthOpenNPPod=LastMonthOpenNPPod,
+						   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, @LastMonthCloseNPPaktif=LastMonthCloseNPPaktif,
+						   @LastMonthCloseNPPod=LastMonthCloseNPPod, @LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+						   from #ODPTtemp 
+								where idx=@CurrRec
+
+					SET @MsgBody1 = @MsgBody1 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@PT+ '</b> </td>	
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthOpenNPPaktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPaktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+		
+			---------------------------------------------------------------------------------------------------------------------------
+			------------------------------------------------------ OD by PT NASIONAL --------------------------------------------------
+			---------------------------------------------------------------------------------------------------------------------------
+
+			select @PT=PT, @OpenNPPAktif=OpenNPPAktif, @OpenNPPOD=OpenNPPOD, 
+				   @OpenPersenNPPOD=OpenPersenNPPOD, @CloseNPPAktif=CloseNPPAktif, 
+				   @CloseNPPOD=CloseNPPOD, @ClosePersenNPPOD=ClosePersenNPPOD,
+				   @LastMonthOpenNPPaktif=LastMonthOpenNPPaktif, @LastMonthOpenNPPod=LastMonthOpenNPPod,
+				   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, @LastMonthCloseNPPaktif=LastMonthCloseNPPaktif,
+				   @LastMonthCloseNPPod=LastMonthCloseNPPod, @LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+				   from #ODPTtemp 
+						where UPPER(PT)='NASIONAL'
+
+			SET @MsgBody1 = @MsgBody1 + 
+			'
+				<tr>
+				<td class="head" align=center> <b>' +@PT+ '</b> </td>	
+				<td class="head" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+				<td class="head" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+				<td class="head" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+				<td class="head" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+				<td class="head" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+				<td class="head" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+				<td class="head" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+				<td class="head" align=center> ' +iif(@LastMonthOpenNPPaktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPaktif,0),'###,###')))+ '</td>		
+				<td class="head" align=center> ' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+				<td class="head" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+				<td class="head" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+				<td class="head" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+				<td class="head" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+				<td class="head" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+				</tr>
+			'
+
+		---------------------------------------------------------------------------------------------------------------------------
+		------------------------------------------------ OD By Wilayah ---------------------------------------------------------
+		---------------------------------------------------------------------------------------------------------------------------
+
+		set @MsgHdr3='
+	            <!-- TABLE OD -->
+					</table>
+					<br>
+                    <table ID="ODWilayah" class="table">
+					     <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By Wilayah </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head"> <b> Wilayah </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  											
+						</tr>
+            '
+
+			select @TotRec=count(*) from #ODWilayahtemp
+			set @CurrRec=1
+
+			while @CurrRec <= @TotRec
+				BEGIN
+
+    --------------- BEGIN Email Body
+					
+					select @WilayahName=WilayahName, @OpenNPPAktif=OpenNPPAktif, @OpenNPPOD=OpenNPPOD, @OpenPersenNPPOD=OpenPersenNPPOD,
+						   @CloseNPPAktif=CloseNPPAktif, @CloseNPPOD=CloseNPPOD, @ClosePersenNPPOD=ClosePersenNPPOD,
+						   @LastMonthOpenNPPAktif=LastMonthOpenNPPAktif, @LastMonthOpenNPPOD=LastMonthOpenNPPOD,
+						   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, @LastMonthCloseNPPAktif=LastMonthCloseNPPAktif,
+						   @LastMonthCloseNPPOD=LastMonthCloseNPPOD,@LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+					from #ODWilayahtemp
+					where idx=@CurrRec
+
+					SET @MsgBody3 = @MsgBody3 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@WilayahName+ '</b> </td>	
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+			
+			select @TotalOpenAktifWilayah=sum(OpenNPPAktif) from #ODWilayahtemp
+			select @TotalOpenODWilayah=sum(OpenNPPOd) from #ODWilayahtemp
+			set @TotalOpenPersenODWilayah = round(CAST(@TotalOpenODWilayah as float)/CAST(@TotalOpenAktifWilayah as float)*100,2)
+
+			select @TotalCloseAktifWilayah=sum(CloseNPPAktif) from #ODWilayahtemp
+			select @TotalCloseODWilayah=sum(CloseNPPOd) from #ODWilayahtemp
+			set @TotalClosePersenODWilayah = round(CAST(@TotalCloseODWilayah as float)/CAST(@TotalCloseAktifWilayah as float)*100,2)
+			
+			select @TotalLastMonthOpenAktifWilayah=sum(LastMonthOpenNPPAktif) from #ODWilayahtemp
+			select @TotalLastMonthOpenODWilayah=sum(LastMonthOpenNPPOd) from #ODWilayahtemp
+			set @TotalLastMonthOpenPersenODWilayah = round(CAST(@TotalLastMonthOpenODWilayah as float)/CAST(@TotalLastMonthOpenAktifWilayah as float)*100,2)
+
+			select @TotalLastMonthCloseAktifWilayah=sum(LastMonthCloseNPPAktif) from #ODWilayahtemp
+			select @TotalLastMonthCloseODWilayah=sum(LastMonthCloseNPPOd) from #ODWilayahtemp
+			set @TotalLastMonthClosePersenODWilayah = round(CAST(@TotalLastMonthCloseODWilayah as float)/CAST(@TotalLastMonthCloseAktifWilayah as float)*100,2)
+
+			SET @MsgBody3 = @MsgBody3 + 
+					'
+						<tr>
+						<td class="head" align=center> <b> NASIONAL </b> </td>	
+						<td class="head" align=center> ' +iif(@TotalOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>
+						</tr>
+					'
+		---------------------------------------------------------------------------------------------------------------------------
+		------------------------------------------------ OD By Group Head ---------------------------------------------------------
+		---------------------------------------------------------------------------------------------------------------------------
+
+		set @MsgHdr2='
+	            <!-- TABLE OD -->
+					</table>
+					<br>
+                    <table ID="ODRegional" class="table">
+					     <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By Group Head </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head"> <b> Group Head </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  											
+						</tr>
+            '
+
+
+			select @TotRec=count(*) from #ODRegionaltemp
+			set @CurrRec=1
+
+			while @CurrRec <= @TotRec
+				BEGIN
+
+    --------------- BEGIN Email Body
+					
+					select @RegionalName=RegionalName, @OpenNPPAktif=OpenNPPAktif, @OpenNPPOD=OpenNPPOD, @OpenPersenNPPOD=OpenPersenNPPOD,
+						   @CloseNPPAktif=CloseNPPAktif, @CloseNPPOD=CloseNPPOD, @ClosePersenNPPOD=ClosePersenNPPOD,
+						   @LastMonthOpenNPPAktif=LastMonthOpenNPPAktif, @LastMonthOpenNPPOD=LastMonthOpenNPPOD,
+						   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, @LastMonthCloseNPPAktif=LastMonthCloseNPPAktif,
+						   @LastMonthCloseNPPOD=LastMonthCloseNPPOD,@LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+						   from #ODRegionaltemp
+								where idx=@CurrRec
+
+					SET @MsgBody2 = @MsgBody2 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@RegionalName+ '</b> </td>	
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+			
+			select @TotalOpenAktifReg=sum(OpenNPPAktif) from #ODRegionaltemp
+			select @TotalOpenODReg=sum(OpenNPPOd) from #ODRegionaltemp
+			set @TotalOpenPersenODReg = round(CAST(@TotalOpenODReg as float)/CAST(@TotalOpenAktifReg as float)*100,2)
+
+			select @TotalCloseAktifReg=sum(CloseNPPAktif) from #ODRegionaltemp
+			select @TotalCloseODReg=sum(CloseNPPOd) from #ODRegionaltemp
+			set @TotalClosePersenODReg = round(CAST(@TotalCloseODReg as float)/CAST(@TotalCloseAktifReg as float)*100,2)
+			
+			select @TotalLastMonthOpenAktifReg=sum(LastMonthOpenNPPAktif) from #ODRegionaltemp
+			select @TotalLastMonthOpenODReg=sum(LastMonthOpenNPPOd) from #ODRegionaltemp
+			set @TotalLastMonthOpenPersenODReg = round(CAST(@TotalLastMonthOpenODReg as float)/CAST(@TotalLastMonthOpenAktifReg as float)*100,2)
+
+			select @TotalLastMonthCloseAktifReg=sum(LastMonthCloseNPPAktif) from #ODRegionaltemp
+			select @TotalLastMonthCloseODReg=sum(LastMonthCloseNPPOd) from #ODRegionaltemp
+			set @TotalLastMonthClosePersenODReg = round(CAST(@TotalLastMonthCloseODReg as float)/CAST(@TotalLastMonthCloseAktifReg as float)*100,2)
+
+			SET @MsgBody2 = @MsgBody2 + 
+					'
+						<tr>
+						<td class="head" align=center> <b> NASIONAL </b> </td>	
+						<td class="head" align=center> ' +iif(@TotalOpenAktifReg=0,'0',convert(varchar(18),format(isnull(@TotalOpenAktifReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalOpenODReg=0,'0',convert(varchar(18),format(isnull(@TotalOpenODReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalOpenPersenODReg=0,'0',convert(varchar(18),isnull(@TotalOpenPersenODReg,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalCloseAktifReg=0,'0',convert(varchar(18),format(isnull(@TotalCloseAktifReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalCloseODReg=0,'0',convert(varchar(18),format(isnull(@TotalCloseODReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODReg=0,'0',convert(varchar(18),isnull(@TotalClosePersenODReg,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODReg-@TotalOpenPersenODReg=0,'0',convert(varchar(18),isnull(@TotalClosePersenODReg-@TotalOpenPersenODReg,0)))+ ' %</b> </td>
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenAktifReg=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenAktifReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenODReg=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenODReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthOpenPersenODReg=0,'0',convert(varchar(18),isnull(@TotalLastMonthOpenPersenODReg,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseAktifReg=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseAktifReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseODReg=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseODReg,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODReg=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODReg,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODReg-@TotalLastMonthOpenPersenODReg=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODReg-@TotalLastMonthOpenPersenODReg,0)))+ ' %</b> </td>
+						</tr>
+					'
+
+
+
+		---------------------------------------------------------------------------------------------------------------------------
+		--------------------------------------------------- OD By Area ------------------------------------------------------------
+		---------------------------------------------------------------------------------------------------------------------------
+
+		set @MsgHdr4='
+	            <!-- TABLE Area -->
+					</table>
+					<br>
+                    <table ID="ODWilayah" class="table">
+					     <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By Area </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head"> <b> Area </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  											
+						</tr>
+            '
+
+			select @TotRec=count(*) from #ODAreaTemp
+			set @CurrRec=1
+
+			while @CurrRec <= @TotRec
+				BEGIN
+
+    --------------- BEGIN Email Body
+					
+					select @AreaName=AreaName, @OpenNPPAktif=OpenNPPAktif, @OpenNPPOD=OpenNPPOD, @OpenPersenNPPOD=OpenPersenNPPOD,
+						   @CloseNPPAktif=CloseNPPAktif, @CloseNPPOD=CloseNPPOD, @ClosePersenNPPOD=ClosePersenNPPOD,
+						   @LastMonthOpenNPPAktif=LastMonthOpenNPPAktif, @LastMonthOpenNPPOD=LastMonthOpenNPPOD,
+						   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, @LastMonthCloseNPPAktif=LastMonthCloseNPPAktif,
+						   @LastMonthCloseNPPOD=LastMonthCloseNPPOD,@LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+					from #ODAreaTemp
+					where idx=@CurrRec
+
+					SET @MsgBody4 = @MsgBody4 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@AreaName+ '</b> </td>	
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+			
+			select @TotalOpenAktifWilayah=sum(OpenNPPAktif) from #ODAreaTemp
+			select @TotalOpenODWilayah=sum(OpenNPPOd) from #ODAreaTemp
+			set @TotalOpenPersenODWilayah = round(CAST(@TotalOpenODWilayah as float)/CAST(@TotalOpenAktifWilayah as float)*100,2)
+
+			select @TotalCloseAktifWilayah=sum(CloseNPPAktif) from #ODAreaTemp
+			select @TotalCloseODWilayah=sum(CloseNPPOd) from #ODAreaTemp
+			set @TotalClosePersenODWilayah = round(CAST(@TotalCloseODWilayah as float)/CAST(@TotalCloseAktifWilayah as float)*100,2)
+			
+			select @TotalLastMonthOpenAktifWilayah=sum(LastMonthOpenNPPAktif) from #ODAreaTemp
+			select @TotalLastMonthOpenODWilayah=sum(LastMonthOpenNPPOd) from #ODAreaTemp
+			set @TotalLastMonthOpenPersenODWilayah = round(CAST(@TotalLastMonthOpenODWilayah as float)/CAST(@TotalLastMonthOpenAktifWilayah as float)*100,2)
+
+			select @TotalLastMonthCloseAktifWilayah=sum(LastMonthCloseNPPAktif) from #ODAreaTemp
+			select @TotalLastMonthCloseODWilayah=sum(LastMonthCloseNPPOd) from #ODAreaTemp
+			set @TotalLastMonthClosePersenODWilayah = round(CAST(@TotalLastMonthCloseODWilayah as float)/CAST(@TotalLastMonthCloseAktifWilayah as float)*100,2)
+
+			SET @MsgBody4 = @MsgBody4 + 
+					'
+						<tr>
+						<td class="head" align=center> <b> NASIONAL </b> </td>	
+						<td class="head" align=center> ' +iif(@TotalOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseAktifWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> ' +iif(@TotalLastMonthCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseODWilayah,0),'###,###')))+ '</td>		
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah,0)))+ ' %</b> </td>	
+						<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>
+						</tr>
+					'
+
+		---------------------------------------------------------------------------------------------------------------------------
+		--------------------------------------------------- OD By Jaringan---------------------------------------------------------
+		---------------------------------------------------------------------------------------------------------------------------
+		--add by yohan 05/09/2024
+
+			set @MsgHdr5='
+	            <!-- TABLE Jaringan -->
+					</table>
+					<br>
+                    <table ID="ODJaringan" class="table">
+					     <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By  Konsol Branch </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head"> <b> Jaringan </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  											
+						</tr>
+            '
+
+
+					    --------------- BEGIN Email Body 
+			select @TotRec=count(*) from #ODParentBranchTemp
+			set @CurrRec=1
+
+			while @CurrRec <= @TotRec
+				BEGIN
+
+					select @ParentBranchName =ParentBranch,
+						   @OpenNPPAktif=OpenNPPAktif,
+	                       @OpenNPPOD=OpenNPPOD, 
+						   @OpenPersenNPPOD=OpenPersenNPPOD,
+						   @CloseNPPAktif=CloseNPPAktif, 
+						   @CloseNPPOD=CloseNPPOD, 
+						   @ClosePersenNPPOD=ClosePersenNPPOD,
+						   @LastMonthOpenNPPAktif=LastMonthOpenNPPAktif, 
+						   @LastMonthOpenNPPOD=LastMonthOpenNPPOD,
+						   @LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, 
+						   @LastMonthCloseNPPAktif=LastMonthCloseNPPAktif,
+						   @LastMonthCloseNPPOD=LastMonthCloseNPPOD,
+						   @LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+					from #ODParentBranchTemp
+					where idx=@CurrRec
+					order by ParentBranch
+
+					
+
+					SET @MsgBody5 = @MsgBody5 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@ParentBranchName+ '</b> </td>		
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+
+				
+			select @TotalOpenAktifWilayah=sum(OpenNPPAktif) from #ODParentBranchTemp
+			select @TotalOpenODWilayah=sum(OpenNPPOd) from #ODParentBranchTemp
+			set @TotalOpenPersenODWilayah = round(CAST(@TotalOpenODWilayah as float)/CAST(@TotalOpenAktifWilayah as float)*100,2)
+
+			select @TotalCloseAktifWilayah=sum(CloseNPPAktif) from #ODParentBranchTemp
+			select @TotalCloseODWilayah=sum(CloseNPPOd) from #ODParentBranchTemp
+			set @TotalClosePersenODWilayah = round(CAST(@TotalCloseODWilayah as float)/CAST(@TotalCloseAktifWilayah as float)*100,2)
+			
+			select @TotalLastMonthOpenAktifWilayah=sum(LastMonthOpenNPPAktif) from #ODParentBranchTemp
+			select @TotalLastMonthOpenODWilayah=sum(LastMonthOpenNPPOd) from #ODParentBranchTemp
+			set @TotalLastMonthOpenPersenODWilayah = round(CAST(@TotalLastMonthOpenODWilayah as float)/CAST(@TotalLastMonthOpenAktifWilayah as float)*100,2)
+
+			select @TotalLastMonthCloseAktifWilayah=sum(LastMonthCloseNPPAktif) from #ODParentBranchTemp
+			select @TotalLastMonthCloseODWilayah=sum(LastMonthCloseNPPOd) from #ODParentBranchTemp
+			set @TotalLastMonthClosePersenODWilayah = round(CAST(@TotalLastMonthCloseODWilayah as float)/CAST(@TotalLastMonthCloseAktifWilayah as float)*100,2)
+
+
+				--select @TotalOpenAktifparentbranch=sum(OpenNPPAktif) from #jaringan
+				--select @TotalOpenODparentbranch=sum(OpenNPPOd) from #jaringan
+				--set @TotalOpenPersenODparentbranch = round(CAST(@TotalOpenODparentbranch as float)/CAST(@TotalOpenAktifparentbranch as float)*100,2)
+
+				--select @TotalCloseAktifparentbranch=sum(CloseNPPAktif) from #jaringan
+				--select @TotalCloseODparentbranch=sum(CloseNPPOd) from #jaringan
+				--set @TotalClosePersenODparentbranch = round(CAST(@TotalCloseODparentbranch as float)/CAST(@TotalCloseAktifparentbranch as float)*100,2)
+			
+				--select @TotalLastMonthOpenAktifparentbranch=sum(LastMonthOpenNPPAktif) from #jaringan
+				--select @TotalLastMonthOpenODparentbranch=sum(LastMonthOpenNPPOd) from #jaringan
+				--set @TotalLastMonthOpenPersenODparentbranch = round(CAST(@TotalLastMonthOpenODparentbranch as float)/CAST(@TotalLastMonthOpenAktifparentbranch as float)*100,2)
+
+				--select @TotalLastMonthCloseAktifparentbranch=sum(LastMonthCloseNPPAktif) from #jaringan
+				--select @TotalLastMonthCloseODparentbranch=sum(LastMonthCloseNPPOd) from #jaringan
+				--set @TotalLastMonthClosePersenODparentbranch = round(CAST(@TotalLastMonthCloseODparentbranch as float)/CAST(@TotalLastMonthCloseAktifparentbranch as float)*100,2)
+
+				SET @MsgBody5 = @MsgBody5 + 
+						'
+							<tr>
+							<td class="head" align=center> <b> Total </b> </td>	
+							<td class="head" align=center> ' +iif(@TotalOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> ' +iif(@TotalCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>
+							<td class="head" align=center> ' +iif(@TotalLastMonthOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalLastMonthOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> ' +iif(@TotalLastMonthCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalLastMonthCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>
+							</tr>
+						'
+
+		---------------------------------------------------------------------------------------------------------------------------
+		--------------------------------------------------- OD By Cabang Pos-------------------------------------------------------
+		---------------------------------------------------------------------------------------------------------------------------
+
+		set @MsgHdr6 = '    	           
+	            <!-- TABLE Cabang pos -->
+					</table>
+					<br>
+                    <table ID="Cabang Pos" class="table">
+					     <tr>
+						   <td colspan="15" class="title" align=center> <b> Unit Over Due By Cabang Pos </b> </td>
+						</tr>
+						<tr>
+							<td rowspan="3" class="head"> <b> Cabang Pos </b> </td>   
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdThisMonth),106) + '</b> </td>
+							<td colspan="7" class="head"> <b>' + convert(varchar(20),convert(datetime,@mtdlastMonth),106) + '</b> </td>							
+						</tr>
+						<tr>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+							<td colspan="3" class="head"> <b> Open </b> </td>
+							<td colspan="3" class="head"> <b> Close </b> </td>
+							<td rowspan="2" class="head"> <b> Changes </b> </td>
+
+						</tr>
+						<tr>
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  		
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>    
+							<td class="head"> <b> Unit Active </b> </td>
+							<td class="head"> <b> Unit OD     </b> </td>  
+							<td class="head"> <b> % OD        </b> </td>  											
+						</tr>
+            '
+
+SELECT @TotRec = COUNT(*) FROM #cabangpostemp;
+SET @CurrRec = 1;
+
+WHILE @CurrRec <= @TotRec
+BEGIN
+   
+    SELECT 
+        --@BranchName = BranchName,
+        --@OpenNPPAktif = OpenNPPAktif,
+        --@OpenNPPOD = OpenNPPOD,
+        --@OpenPersenNPPOD = OpenPersenNPPOD,
+        --@CloseNPPAktif = CloseNPPAktif,
+        --@CloseNPPOD = CloseNPPOD,
+        --@ClosePersenNPPOD = ClosePersenNPPOD,
+        --@LastMonthOpenNPPAktif = LastMonthOpenNPPAktif,
+        --@LastMonthOpenNPPOD = LastMonthOpenNPPOD,
+        --@LastMonthOpenPersenNPPOD = LastMonthOpenPersenNPPOD,
+        --@LastMonthCloseNPPAktif = LastMonthCloseNPPAktif,
+        --@LastMonthCloseNPPOD = LastMonthCloseNPPOD,
+        --@LastMonthClosePersenNPPOD = LastMonthClosePersenNPPOD
+		@ParentBranchName =BranchName,
+		@OpenNPPAktif=OpenNPPAktif,
+	    @OpenNPPOD=OpenNPPOD, 
+		@OpenPersenNPPOD=OpenPersenNPPOD,
+		@CloseNPPAktif=CloseNPPAktif, 
+		@CloseNPPOD=CloseNPPOD, 
+		@ClosePersenNPPOD=ClosePersenNPPOD,
+		@LastMonthOpenNPPAktif=LastMonthOpenNPPAktif, 
+		@LastMonthOpenNPPOD=LastMonthOpenNPPOD,
+		@LastMonthOpenPersenNPPOD=LastMonthOpenPersenNPPOD, 
+		@LastMonthCloseNPPAktif=LastMonthCloseNPPAktif,
+		@LastMonthCloseNPPOD=LastMonthCloseNPPOD,
+		@LastMonthClosePersenNPPOD=LastMonthClosePersenNPPOD
+        from #cabangpostemp
+	    where idx=@CurrRec 
+	    order by BranchName 
+
+
+SET @MsgBody6 = @MsgBody6 + 
+					'
+						<tr>
+						<td class="title" align=center> <b>' +@ParentBranchName+ '</b> </td>		
+						<td class="td" align=center> ' +iif(@OpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@OpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@OpenNPPOD=0,'0',convert(varchar(18),format(isnull(@OpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@CloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@CloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@CloseNPPOD=0,'0',convert(varchar(18),format(isnull(@CloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@ClosePersenNPPOD-@OpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@ClosePersenNPPOD-@OpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center>' +iif(@LastMonthOpenNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthOpenNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPAktif=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPAktif,0),'###,###')))+ '</td>		
+						<td class="td" align=center> ' +iif(@LastMonthCloseNPPOD=0,'0',convert(varchar(18),format(isnull(@LastMonthCloseNPPOD,0),'###,###')))+ '</td>		
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD,0)))+ ' %</b> </td>	
+						<td class="important" align=center> <b>' +iif(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD=0,'0',convert(varchar(18),isnull(@LastMonthClosePersenNPPOD-@LastMonthOpenPersenNPPOD,0)))+ ' %</b> </td>
+						</tr>
+					'
+					SET @CurrRec=@CurrRec+1
+				END
+
+			select @TotalOpenAktifWilayah=sum(OpenNPPAktif) from #cabangpostemp
+			select @TotalOpenODWilayah=sum(OpenNPPOd) from #cabangpostemp
+			set @TotalOpenPersenODWilayah = round(CAST(@TotalOpenODWilayah as float)/CAST(@TotalOpenAktifWilayah as float)*100,2)
+
+			select @TotalCloseAktifWilayah=sum(CloseNPPAktif) from #cabangpostemp
+			select @TotalCloseODWilayah=sum(CloseNPPOd) from #cabangpostemp
+			set @TotalClosePersenODWilayah = round(CAST(@TotalCloseODWilayah as float)/CAST(@TotalCloseAktifWilayah as float)*100,2)
+			
+			select @TotalLastMonthOpenAktifWilayah=sum(LastMonthOpenNPPAktif) from #cabangpostemp
+			select @TotalLastMonthOpenODWilayah=sum(LastMonthOpenNPPOd) from #cabangpostemp
+			set @TotalLastMonthOpenPersenODWilayah = round(CAST(@TotalLastMonthOpenODWilayah as float)/CAST(@TotalLastMonthOpenAktifWilayah as float)*100,2)
+
+			select @TotalLastMonthCloseAktifWilayah=sum(LastMonthCloseNPPAktif) from #cabangpostemp
+			select @TotalLastMonthCloseODWilayah=sum(LastMonthCloseNPPOd) from #cabangpostemp
+			set @TotalLastMonthClosePersenODWilayah = round(CAST(@TotalLastMonthCloseODWilayah as float)/CAST(@TotalLastMonthCloseAktifWilayah as float)*100,2)
+
+    --            select @TotalOpenAktifBranchName=sum(OpenNPPAktif) from #cabangpostemp
+				--select @TotalOpenODBranchName=sum(OpenNPPOd) from #cabangpostemp
+				--set @TotalOpenPersenODBranchName = round(CAST(@TotalOpenODBranchName as float)/CAST(@TotalOpenAktifBranchName as float)*100,2)
+
+				--select @TotalCloseAktifBranchName=sum(CloseNPPAktif) from #cabangpostemp
+				--select @TotalCloseODBranchName=sum(CloseNPPOd) from #cabangpostemp
+				--set @TotalClosePersenODBranchName = round(CAST(@TotalCloseODBranchName as float)/CAST(@TotalCloseAktifBranchName as float)*100,2)
+			
+				--select @TotalLastMonthOpenAktifBranchName=sum(LastMonthOpenNPPAktif) from #cabangpostemp
+				--select @TotalLastMonthOpenODBranchName=sum(LastMonthOpenNPPOd) from #cabangpostemp
+				--set @TotalLastMonthOpenPersenODBranchName = round(CAST(@TotalLastMonthOpenODBranchName as float)/CAST(@TotalLastMonthOpenAktifBranchName as float)*100,2)
+
+				--select @TotalLastMonthCloseAktifBranchName=sum(LastMonthCloseNPPAktif) from #cabangpostemp
+				--select @TotalLastMonthCloseODBranchName=sum(LastMonthCloseNPPOd) from #cabangpostemp
+				--set @TotalLastMonthClosePersenODBranchName = round(CAST(@TotalLastMonthCloseODBranchName as float)/CAST(@TotalLastMonthCloseAktifBranchName as float)*100,2)
+
+				SET @MsgBody6 = @MsgBody6 + 
+						'
+							<tr>
+							<td class="head" align=center> <b> Total </b> </td>	
+							<td class="head" align=center> ' +iif(@TotalOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalOpenODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> ' +iif(@TotalCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalCloseODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> <b>' +iif(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalClosePersenODWilayah-@TotalOpenPersenODWilayah,0)))+ ' %</b> </td>
+							<td class="head" align=center> ' +iif(@TotalLastMonthOpenAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalLastMonthOpenODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthOpenODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> ' +iif(@TotalLastMonthCloseAktifWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseAktifWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> ' +iif(@TotalLastMonthCloseODWilayah=0,'0',convert(varchar(18),format(isnull(@TotalLastMonthCloseODWilayah,0),'###,###')))+ '</td>		
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah,0)))+ ' %</b> </td>	
+							<td class="head" align=center> <b>' +iif(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah=0,'0',convert(varchar(18),isnull(@TotalLastMonthClosePersenODWilayah-@TotalLastMonthOpenPersenODWilayah,0)))+ ' %</b> </td>
+							</tr>
+						'
+		
+------------------------------------------------------------------------------------------------------------------------------------------------
+										
+		set @MsgFtr = ' 
+		                </table>
+						<br>
+
+						<!-- TABLE INFO GENERATE -->
+						<table ID="InfoGenerate" class="table">					
+						<tr>
+                             <td colspan="7" class="head"> <i> Generated on :   ' + convert(varchar(12),getdate(),106) + space(4) + convert(varchar(12),getdate(),108) + space(10) +' </i></td>
+                        </tr>
+						</table>
+					   </body>
+                      </html>
+                      '
+
+  
+	--set @mailRecipients='stella.mathilda@mcf.co.id'
+	--set @bcc = 'indrajaya.suroto@mcf.co.id'
+	--;budi_pranoto@yahoo.com;liem.cu.tee@gmail.com
+	
+	if @piIntEmail='1'
+		Begin
+			select @ProfileName=ProfileName, @BodyFormat=BodyFormat, @Subject=Subject, 
+				   @MailRecipients=MailRecipients, @MailCopyRecipients=MailCopyRecipients, 
+				   @MailBlindCopyRecipients=BlindCopyRecipients 
+				   from SysMail 
+						where upper(Program)='Over Due Top Management' and upper(server)='MACF-DBREP'
+		End
+	else 
+		Begin
+			select @ProfileName=ProfileName, @BodyFormat=BodyFormat, @Subject=Subject, 
+				   @MailRecipients=MailRecipients, @MailCopyRecipients=MailCopyRecipients, 
+				   @MailBlindCopyRecipients=BlindCopyRecipients 
+				   from SysMail 
+						where mailid='72'
+		End
+
+
+	set @MailRecipients= 'anthony.wijaya@mcf.co.id'
+	set @MailCopyRecipients=''
+	set @MailBlindCopyRecipients=''
+
+	set @MailBody = @MsgHdr1+@MsgBody1+@Pemisah+@Pemisah+@MsgHdr3+@MsgBody3+@Pemisah+@Pemisah+
+					@MsgHdr2+@MsgBody2+@MsgHdr4+@MsgBody4+@Pemisah+@Pemisah
+					+@MsgHdr5+@MsgBody5+@Pemisah+@Pemisah
+					+@MsgHdr6+@MsgBody6+@Pemisah+@Pemisah /*add sheila 20250305*/
+					
+					+@MsgFtr
+	set @Attachments = ''
+
+
+	if(@mailRecipients <> '')
+		begin
+			EXEC msdb.dbo.sp_send_dbmail
+			@profile_name=@ProfileName,  ---- 'DBMail' == >UAT
+			@recipients=@MailRecipients,
+			@copy_recipients=@MailCopyRecipients, 
+			@blind_copy_recipients=@MailBlindCopyRecipients,
+			@subject=@Subject,
+			@body=@MailBody,
+			@body_format = @BodyFormat,
+			@file_attachments = @Attachments
+		END
+END
+
+--EXECUTE msdb.dbo.sysmail_add_principalprofile_sp
+--    @profile_name = 'AgentInfo',
+--    @principal_name = 'public',
+--    @is_default = 1 ;
+
